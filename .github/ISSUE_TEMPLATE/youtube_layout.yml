@@ -1,0 +1,28 @@
+name: YouTube layout changed
+description: Videos aren't being scored, or "Not interested" isn't clicked
+labels: [selectors]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        YouTube changes its markup often. When that happens, [`lib/selectors.ts`](../blob/main/lib/selectors.ts)
+        needs an update, and a PR is very welcome (see CONTRIBUTING.md).
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where does it break?
+      multiple: true
+      options: [Home feed tiles not scored, Sidebar tiles not scored, Shorts not scored, "Not interested not clicked", Score line in the wrong place]
+    validations:
+      required: true
+  - type: input
+    id: lang
+    attributes:
+      label: YouTube interface language
+      placeholder: English
+  - type: textarea
+    id: html
+    attributes:
+      label: Tile markup (optional)
+      description: Right-click a video → Inspect, then copy the outer tag names. Remove anything personal.
+      render: html

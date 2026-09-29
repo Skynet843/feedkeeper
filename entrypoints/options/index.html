@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FeedKeeper settings</title>
+    <meta name="manifest.open_in_tab" content="true" />
+    <style>
+      main {
+        max-width: 680px;
+        margin: 0 auto;
+        padding: 28px 16px 60px;
+      }
+      section {
+        margin-top: 28px;
+      }
+      label.field {
+        display: block;
+        margin-bottom: 10px;
+      }
+      label.field > span {
+        display: block;
+        font-weight: 500;
+        margin-bottom: 4px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .cat {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 4px 10px;
+        align-items: start;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border);
+      }
+      .cat input[type='checkbox'] {
+        margin-top: 3px;
+        accent-color: var(--accent);
+      }
+      .group-title {
+        margin: 18px 0 2px;
+        font-size: 14px;
+      }
+      .cat .desc {
+        grid-column: 2 / 4;
+      }
+      .grid4 {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 10px;
+      }
+      .grid2 {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 14px;
+      }
+      .profile,
+      .history-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 9px 0;
+        border-bottom: 1px solid var(--border);
+      }
+      .profile > div,
+      .history-item > div {
+        flex: 1;
+      }
+      #saved {
+        position: fixed;
+        right: 16px;
+        bottom: 16px;
+        padding: 6px 12px;
+        border-radius: 6px;
+        background: var(--ok);
+        color: #fff;
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+      #saved.show {
+        opacity: 1;
+      }
+      .ok {
+        color: var(--ok);
+      }
+      .err {
+        color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1 style="font-size: 22px">FeedKeeper settings</h1>
+      <p class="muted">Changes save automatically.</p>
+
+      <section>
+        <h2>API</h2>
+        <label class="field">
+          <span>OpenRouter API key</span>
+          <div class="row">
+            <input type="password" id="apiKey" placeholder="sk-or-v1-…" autocomplete="off" spellcheck="false" />
+            <button id="test">Test</button>
+          </div>
+        </label>
+        <p class="muted" id="test-result">
+          Stored only in this browser. Used for TypeSafe Jev calls through OpenRouter.
+        </p>
+        <label class="field">
+          <span>Jev model</span>
+          <input type="text" id="model" spellcheck="false" />
+        </label>
+      </section>
+
+      <section>
+        <h2>Categories</h2>
+        <p class="muted">
+          Each checked category is sent to Jev as a yes/no question. The description is the definition Jev uses,
+          so make it specific.
+        </p>
+        <div id="cats"></div>
+        <h3 style="font-size: 14px; margin: 18px 0 8px">Add your own</h3>
+        <label class="field"><span>Name</span><input type="text" id="new-label" placeholder="e.g. Cricket" /></label>
+        <label class="field">
+          <span>Definition</span>
+          <textarea id="new-desc" placeholder="e.g. Cricket matches, highlights, IPL news, player interviews."></textarea>
+        </label>
+        <button id="add-cat" class="primary">Add category</button>
+      </section>
+
+      <section>
+        <h2>Channel rules</h2>
+        <div class="grid2">
+          <label class="field">
+            <span>Always allow</span>
+            <textarea id="allowlist" placeholder="One channel name per line, exactly as shown on YouTube"></textarea>
+          </label>
+          <label class="field">
+            <span>Always block</span>
+            <textarea id="blocklist" placeholder="One channel name per line, exactly as shown on YouTube"></textarea>
+          </label>
+        </div>
+        <p class="muted">Local channel rules are applied before AI classification and do not cost anything. Allow wins if a channel is in both lists.</p>
+      </section>
+
+      <section>
+        <h2>Classification</h2>
+        <div class="grid2">
+          <label class="field">
+            <span>Filter direction</span>
+            <select id="filterDirection">
+              <option value="block">Block selected categories</option>
+              <option value="allow">Only show selected categories</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Matching method</span>
+            <select id="matchMethod">
+              <option value="combined">Combined selected-category decision</option>
+              <option value="individual">Any single category must reach the threshold</option>
+            </select>
+          </label>
+        </div>
+        <p class="muted">Combined matching asks one direct question across the selected definitions, so strong evidence split between overlapping categories is not missed.</p>
+        <label class="row" style="margin-bottom: 8px"
+          ><input type="checkbox" id="useDescription" /> Also give Jev each video's description, tags and YouTube
+          category (fetched from YouTube, ~250 ms per new video). More accurate than the title alone.</label
+        >
+        <div class="grid2" style="margin-top: 14px">
+          <label class="field">
+            <span>Borderline results</span>
+            <select id="uncertainBehavior">
+              <option value="show">Show normally</option>
+              <option value="dim">Dim as uncertain</option>
+              <option value="hide">Hide</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Borderline range below threshold</span>
+            <select id="uncertainMargin">
+              <option value="0.1">10 percentage points</option>
+              <option value="0.15">15 percentage points</option>
+              <option value="0.2">20 percentage points</option>
+              <option value="0.25">25 percentage points</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section>
+        <h2>Free title rules</h2>
+        <div class="grid2">
+          <label class="field"><span>Always allow when title contains</span><textarea id="allowedKeywords" placeholder="One phrase per line"></textarea></label>
+          <label class="field"><span>Always block when title contains</span><textarea id="blockedKeywords" placeholder="One phrase per line"></textarea></label>
+        </div>
+        <p class="muted">Matched as whole words or phrases, ignoring case, before contacting Jev (add plurals such as "pranks" separately). Allow rules win over block rules.</p>
+      </section>
+
+      <section>
+        <h2>Where FeedKeeper runs</h2>
+        <label class="row" style="margin-bottom: 8px"><input type="checkbox" id="surfaceHome" /> YouTube home feed, including Shorts shelves</label>
+        <label class="row"><input type="checkbox" id="surfaceWatch" /> Recommendations beside a playing video</label>
+        <label class="row" style="margin-top: 14px"><input type="checkbox" id="blockShorts" /> Block Shorts everywhere on YouTube</label>
+        <p class="muted">Hides Shorts shelves, single Shorts in feeds and search, and the Shorts menu entry. Hidden Shorts are never scored, so this costs nothing.</p>
+      </section>
+
+      <section>
+        <h2>Profiles and focus sessions</h2>
+        <p class="muted">Save the current direction, sensitivity and category selection. Profiles can be applied permanently here or temporarily from the popup.</p>
+        <div class="row">
+          <input type="text" id="profileName" placeholder="e.g. Study" maxlength="40" />
+          <button id="saveProfile" class="primary">Save current filter</button>
+        </div>
+        <div id="profiles"></div>
+      </section>
+
+      <section>
+        <h2>Decision history</h2>
+        <label class="row"><input type="checkbox" id="historyEnabled" /> Keep the latest 200 filtered-video decisions locally</label>
+        <div class="row" style="margin-top: 10px">
+          <button id="refreshHistory">Refresh</button>
+          <button id="clearHistory">Clear history</button>
+        </div>
+        <div id="history"></div>
+      </section>
+
+      <section>
+        <h2>Auto remove pacing</h2>
+        <p class="muted">Clicking too fast can look like a bot to YouTube. Keep these conservative.</p>
+        <div class="grid4">
+          <label class="field"><span>Min gap (s)</span><input type="number" id="minDelay" min="0.5" step="0.5" /></label>
+          <label class="field"><span>Max gap (s)</span><input type="number" id="maxDelay" min="0.5" step="0.5" /></label>
+          <label class="field"><span>Max per minute</span><input type="number" id="perMinute" min="1" /></label>
+          <label class="field"><span>Max per page load</span><input type="number" id="perSession" min="1" /></label>
+        </div>
+      </section>
+
+      <section>
+        <h2>Cache</h2>
+        <p class="muted">Scores are cached per video for 14 days, so each video is only paid for once.</p>
+        <div class="row">
+          <button id="clear-cache">Clear cached scores</button>
+          <span class="muted" id="cache-result"></span>
+        </div>
+      </section>
+    </main>
+    <div id="saved">Saved</div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,41 @@
+name: Bug report
+description: Something doesn't work as described
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead. Screenshots help a lot.
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      multiple: true
+      options: [Home feed, Watch page sidebar, Popup, Settings page]
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options: [Preview, Hide, Auto remove]
+    validations:
+      required: true
+  - type: input
+    id: pill
+    attributes:
+      label: Status pill text
+      description: The small "FeedKeeper …" pill in the bottom-left corner of YouTube, if it shows an error.
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      placeholder: FeedKeeper 1.0.0, Chrome 140, macOS 15
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: "⚠️ Never paste your OpenRouter API key into an issue."

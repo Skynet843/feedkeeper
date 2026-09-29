@@ -1,0 +1,38 @@
+{
+  "name": "feedkeeper",
+  "description": "Cleans your YouTube feed: classifies videos with TypeSafe Jev and removes the categories you don't want.",
+  "private": true,
+  "version": "1.0.0",
+  "license": "MIT",
+  "author": "Souvik Samanta (https://github.com/Skynet843)",
+  "homepage": "https://github.com/Skynet843/feedkeeper#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Skynet843/feedkeeper.git"
+  },
+  "bugs": "https://github.com/Skynet843/feedkeeper/issues",
+  "keywords": [
+    "chrome-extension",
+    "youtube",
+    "digital-wellbeing",
+    "focus",
+    "ai",
+    "openrouter",
+    "wxt"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "build": "wxt build",
+    "zip": "wxt zip",
+    "compile": "tsc --noEmit",
+    "postinstall": "wxt prepare",
+    "spike": "node scripts/jev-spike.mjs",
+    "eval": "node --env-file-if-exists=.env scripts/category-eval.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "wxt": "^0.21.4"
+  },
+  "packageManager": "pnpm@9.8.0"
+}

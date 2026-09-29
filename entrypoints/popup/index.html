@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FeedKeeper</title>
+    <style>
+      body {
+        width: 380px;
+        min-height: 580px;
+      }
+      body > section {
+        margin: 14px 16px 0;
+        padding: 14px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--surface);
+        box-shadow: var(--shadow-sm);
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 18px 17px;
+        border-bottom: 1px solid var(--border);
+        background:
+          radial-gradient(circle at 78% -60%, var(--accent-soft), transparent 62%),
+          var(--surface);
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+      }
+      .brand img {
+        width: 38px;
+        height: 38px;
+        border-radius: 11px;
+        box-shadow: 0 8px 22px color-mix(in srgb, var(--accent) 24%, transparent);
+      }
+      .power {
+        display: grid;
+        justify-items: end;
+        gap: 4px;
+      }
+      .power-label {
+        font-size: 10px;
+        line-height: 1;
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+        font-weight: 700;
+        color: var(--muted);
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      input[type='range'] {
+        flex: 1;
+        accent-color: var(--accent);
+      }
+      #stats {
+        background:
+          linear-gradient(145deg, var(--accent-soft), transparent 48%),
+          var(--surface);
+      }
+      .group {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+      .group + .group {
+        margin-top: 6px;
+      }
+      .group summary {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 10px;
+        cursor: pointer;
+        list-style: none;
+        user-select: none;
+      }
+      .group summary::-webkit-details-marker {
+        display: none;
+      }
+      .group summary::before {
+        content: '▸';
+        color: var(--muted);
+        transition: transform 0.15s;
+      }
+      .group[open] summary::before {
+        transform: rotate(90deg);
+      }
+      .group-name {
+        font-weight: 500;
+      }
+      .group-count {
+        margin-left: auto;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .group-count.has {
+        color: var(--accent);
+        font-weight: 600;
+      }
+      .group .chips {
+        padding: 0 10px 10px;
+      }
+      #custom-form {
+        display: grid;
+        gap: 6px;
+        margin-top: 10px;
+      }
+      #custom-form[hidden] {
+        display: none;
+      }
+      .setting-row {
+        font-size: 13px;
+        margin-top: 8px;
+      }
+      .setting-row input {
+        accent-color: var(--accent);
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+        text-align: center;
+      }
+      .stats div {
+        background: var(--panel);
+        border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+        border-radius: 10px;
+        padding: 9px 3px 8px;
+      }
+      .stats b {
+        display: block;
+        margin-bottom: 1px;
+        font-size: 17px;
+        line-height: 1.2;
+        letter-spacing: -0.02em;
+      }
+      .tagline {
+        margin: 3px 0 0;
+        font-size: 12px;
+      }
+      footer {
+        margin-top: 14px;
+        padding: 13px 18px 15px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-top: 1px solid var(--border);
+        background: var(--surface);
+      }
+      #mode-help,
+      #key-status {
+        margin-bottom: 0;
+      }
+      #selected-summary {
+        line-height: 1.4;
+      }
+      #shorts-section {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      #shorts-section h2 {
+        margin-bottom: 4px;
+      }
+      #shorts-section p {
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <img src="/icon/48.png" alt="" />
+        <div>
+          <h1>FeedKeeper</h1>
+          <p class="muted tagline">Your feed, on your terms.</p>
+        </div>
+      </div>
+      <div class="power">
+        <span class="power-label">Protection</span>
+        <label class="switch" title="Enable on the YouTube home feed and video recommendations">
+          <input type="checkbox" id="enabled" aria-label="Enable FeedKeeper" />
+          <span></span>
+        </label>
+      </div>
+    </header>
+
+    <section id="stats">
+      <h2>Today</h2>
+      <div class="stats">
+        <div><b id="s-scanned">0</b><span class="muted">scanned</span></div>
+        <div><b id="s-matched">0</b><span class="muted" id="s-matched-label">filtered</span></div>
+        <div><b id="s-actioned">0</b><span class="muted">removed</span></div>
+        <div><b id="s-cost">$0</b><span class="muted">cost</span></div>
+      </div>
+    </section>
+
+    <section id="key-section">
+      <h2>OpenRouter API key</h2>
+      <div id="key-edit">
+        <div class="row">
+          <input type="password" id="key-input" placeholder="sk-or-v1-…" autocomplete="off" spellcheck="false" />
+          <button id="key-save" class="primary">Save</button>
+        </div>
+        <p class="muted">
+          Get one at <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">openrouter.ai/keys</a>.
+          Stored only in this browser.
+        </p>
+      </div>
+      <div id="key-view" class="row" hidden>
+        <code id="key-masked" style="flex: 1"></code>
+        <button id="key-change">Change</button>
+      </div>
+      <p id="key-status" class="muted" hidden></p>
+    </section>
+
+    <section id="shorts-section">
+      <div>
+        <h2>Block Shorts</h2>
+        <p class="muted">Hides every Short on YouTube. Free: hidden Shorts are never scored.</p>
+      </div>
+      <label class="switch" title="Hide Shorts shelves, tiles, search results and the Shorts menu entry">
+        <input type="checkbox" id="blockShorts" aria-label="Block Shorts" />
+        <span></span>
+      </label>
+    </section>
+
+    <section>
+      <h2>Filter direction</h2>
+      <div class="segmented" id="direction">
+        <button data-direction="block">Block selected</button>
+        <button data-direction="allow">Only show selected</button>
+      </div>
+      <p class="muted" id="direction-help"></p>
+    </section>
+
+    <section>
+      <h2>Mode</h2>
+      <div class="segmented" id="mode">
+        <button data-mode="preview">Preview</button>
+        <button data-mode="hide">Hide</button>
+        <button data-mode="auto">Auto remove</button>
+      </div>
+      <p class="muted" id="mode-help"></p>
+    </section>
+
+    <section>
+      <h2 id="categories-heading">Block these</h2>
+      <p class="muted" id="selected-summary" style="margin-top: 0"></p>
+      <div id="cats"></div>
+      <button id="custom-open" class="chip" style="margin-top: 10px">+ Custom category</button>
+      <form id="custom-form" hidden>
+        <input type="text" id="custom-label" placeholder="Name, e.g. Bollywood" maxlength="40" required />
+        <textarea
+          id="custom-desc"
+          rows="3"
+          placeholder="What counts, e.g. Bollywood movies, songs, trailers, actor interviews and gossip."
+          required
+        ></textarea>
+        <div class="row">
+          <button type="submit" class="primary">Add</button>
+          <button type="button" id="custom-cancel">Cancel</button>
+          <span class="muted" id="custom-error"></span>
+        </div>
+      </form>
+    </section>
+
+    <section>
+      <h2>Sensitivity</h2>
+      <div class="row">
+        <input type="range" id="threshold" min="0.5" max="0.95" step="0.05" />
+        <span id="threshold-value" style="width: 38px; text-align: right"></span>
+      </div>
+      <p class="muted" id="threshold-help">A video counts as a match when Jev is at least this sure.</p>
+      <label class="row setting-row">
+        <input type="checkbox" id="combinedMatch" />
+        <span>Combine evidence across selected categories</span>
+      </label>
+    </section>
+
+    <section id="focus-section">
+      <h2>Focus session</h2>
+      <div id="focus-active" hidden>
+        <p id="focus-status" style="margin-top: 0"></p>
+        <button id="focus-stop">Stop and restore previous filter</button>
+      </div>
+      <div id="focus-start">
+        <div class="row">
+          <select id="focus-profile" style="flex: 1"></select>
+          <select id="focus-minutes">
+            <option value="30">30 min</option>
+            <option value="60" selected>1 hour</option>
+            <option value="120">2 hours</option>
+            <option value="240">4 hours</option>
+          </select>
+          <button id="focus-go">Start</button>
+        </div>
+        <p class="muted" id="focus-help">Create a profile in Settings, then apply it temporarily here.</p>
+      </div>
+    </section>
+
+    <footer>
+      <span class="muted">Home feed + video sidebar</span>
+      <button id="open-options">Settings</button>
+    </footer>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

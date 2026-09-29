@@ -1,0 +1,15 @@
+name: Feature or category request
+description: Suggest a feature, or a category that should be built in
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like FeedKeeper to do?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why is it useful?
+      description: For a new category, include a proposed definition and a few example video titles that should match and not match.
