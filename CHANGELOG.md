@@ -5,6 +5,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-30
+
+Compared with 1.0.0 on 293 labelled videos, scans decide 1046 of 1059 filter decisions correctly instead of 1034,
+and cost about half as much: 879 input tokens per video instead of 1648 with the default three categories
+(about $0.037 instead of $0.069 per 1,000 videos). Shorts are no longer sent to the AI at all.
+
 ### Added
 
 - **Corrections:** with history on, choosing **Always show video** or **Always hide video** under **Why?** saves the
@@ -13,27 +19,25 @@ All notable changes to this project are documented here. The format follows
 - 128 more labelled eval videos (`holdout4`, `holdout5`): Hindi and Hinglish titles, overlap-heavy cases and the
   thinner categories, plus a scenario for the default Comedy, Vlogs and Challenges selection.
 
+### Changed
+
+- With combined matching and two or more selected categories, a scan asks Jev only the combined question instead
+  of that question plus one per selected category. Requests are about half the size with the default three
+  categories and about 40% with nine. The badge no longer names the top matching categories until you choose
+  **Why?**.
+- Shorts are never classified. **Block Shorts** hides them for free; with it off they are shown unfiltered.
+- Shorter question wording without the separate yes/no criteria, and no format field. **Why?** costs 27% fewer
+  tokens. Cached scores are asked again once, because the question version changed.
+- Tighter definitions: Challenges covers creator-versus-creator contests, timed survival stays and philanthropy
+  stunts; Vlogs covers ASMR, roleplay and what-I-eat-in-a-day videos; Drama covers celebrity controversy roundups;
+  Music covers music production. Lifestyle, Health, Podcasts and News exclude eating challenges, routine vlogs, TV
+  debates and campaign speeches. Unwanted videos shown drop from 22 to 8 and **Why?** false matches from 11 to 0;
+  wanted videos hidden rise from 3 to 5, all borderline (57–74%) in **Only show selected**.
+
 ### Fixed
 
 - The daily cost counter showed $0 when a TypeSafe key is attached to OpenRouter (BYOK), because OpenRouter reports
   those requests as free. A reported $0 for a request that used tokens now falls back to the token estimate.
-
-### Changed
-
-- Shorts are never classified. **Block Shorts** hides them for free; with it off they are shown unfiltered.
-- Shorter question wording without the separate yes/no criteria, and no format field. Scans cost 2–12% fewer
-  tokens and **Why?** 27% fewer. Cached scores are asked again once, because the question version changed.
-- Tighter definitions: Challenges covers creator-versus-creator contests, timed survival stays and philanthropy
-  stunts; Vlogs covers ASMR, roleplay and what-I-eat-in-a-day videos; Drama covers celebrity controversy roundups;
-  Music covers music production. Lifestyle, Health, Podcasts and News exclude eating challenges, routine vlogs, TV
-  debates and campaign speeches. On 293 labelled videos, scans decide 1046/1059 correctly instead of 1033, with
-  8 unwanted videos shown instead of 23 and 5 wanted videos hidden instead of 3 (all borderline, 57–74%), and
-  **Why?** makes no false matches instead of 11.
-
-- With combined matching and two or more selected categories, a scan now asks Jev only the combined question
-  instead of that question plus one per selected category. Requests are about half the size with the default
-  three categories and about a third with nine, and accuracy on the labelled eval set is unchanged (148/151 and
-  126/126 at 75%). The badge no longer names the top matching categories until you choose **Why?**.
 
 ## [1.0.0] - 2026-09-29
 

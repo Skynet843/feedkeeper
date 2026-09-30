@@ -2,7 +2,7 @@
   "name": "feedkeeper",
   "description": "Cleans your YouTube feed: classifies videos with TypeSafe Jev and removes the categories you don't want.",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "license": "MIT",
   "author": "Souvik Samanta (https://github.com/Skynet843)",
   "homepage": "https://github.com/Skynet843/feedkeeper#readme",
