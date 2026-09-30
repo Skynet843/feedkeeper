@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser';
-import { categoriesToScore, combinedSelectionCategory } from './categories';
+import { categoriesToScore } from './categories';
 import { estimateCost, systemOne } from './jev';
 import { buildJevRequest, QUESTION_VERSION } from './request';
 import { bumpStats } from './storage';
@@ -21,9 +21,7 @@ interface CacheEntry {
 
 /** Returns null when details are wanted but haven't been fetched yet (see ClassifyResponse.needDetails). */
 export async function classify(video: VideoMeta, settings: Settings, inspect = false): Promise<Scores | null> {
-  const cats = [...categoriesToScore(settings, inspect)];
-  const combined = combinedSelectionCategory(settings);
-  if (combined) cats.push(combined);
+  const cats = categoriesToScore(settings, inspect);
   if (cats.length === 0) return {};
 
   const cacheKey = CACHE_PREFIX + video.videoId;

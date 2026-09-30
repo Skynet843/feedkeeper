@@ -161,7 +161,7 @@ flowchart LR
     B --> C{Cached?}
     C -- yes --> F
     C -- no --> D[Fetch description, chapters,<br/>tags from YouTube]
-    D --> E[Background worker asks Jev:<br/>selected categories + combined decision]
+    D --> E[Background worker asks Jev:<br/>combined decision, or each selected category]
     E --> F[Selected-category confidence]
     F --> G{Above sensitivity?}
     G -- Preview --> H[Outline + decision badge]
@@ -170,9 +170,10 @@ flowchart LR
 ```
 
 Classification uses [TypeSafe Jev](https://openrouter.ai/typesafe) through OpenRouter's System One API. Instead
-of generating text, Jev answers each category as a probability (a `noul` question). Selected categories and the
-combined decision go in **one request per video**. Remaining category scores are requested and cached only when
-you choose **Why?**. Editing a definition re-asks only its affected score and the combined decision.
+of generating text, Jev answers each category as a probability (a `noul` question). Each video costs **one request**:
+with combined matching and two or more selected categories it asks only the combined decision, which already carries
+every selected definition; otherwise it asks each selected category. Per-category scores are requested and cached
+only when you choose **Why?**. Editing a definition re-asks only the questions that include it.
 
 The extension asks for only two capabilities: local extension storage and network access to `openrouter.ai`.
 It has no FeedKeeper server, analytics SDK, or runtime package dependencies. Read the

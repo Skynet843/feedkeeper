@@ -82,7 +82,7 @@ to YouTube.
 - Tile identity is checked again after asynchronous work because YouTube recycles DOM nodes.
 - Errors surface in the on-page status pill and are retried after a delay.
 - Allow-only filtering never triggers automated **Not interested** clicks.
-- Full category distributions are opt-in per video; normal scanning asks only selected categories and the combined decision.
+- Full category distributions are opt-in per video; normal scanning asks only the combined decision (or each selected category when combined matching is off or one category is selected).
 
 ## Extension permissions
 

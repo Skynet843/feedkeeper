@@ -99,9 +99,14 @@ export function newCustomCategory(label: string, description: string): Category 
   };
 }
 
-/** Categories Jev is asked about. Full distribution is fetched only on explicit inspection. */
+/**
+ * Questions Jev is asked about a video. A scan asks only what the decision needs: the combined question when it
+ * applies (it already carries every selected definition), otherwise each selected category. Why? asks for all.
+ */
 export function categoriesToScore(s: Settings, inspect = false): Category[] {
-  return inspect ? s.categories : s.categories.filter((c) => c.enabled);
+  const combined = combinedSelectionCategory(s);
+  if (inspect) return combined ? [...s.categories, combined] : s.categories;
+  return combined ? [combined] : s.categories.filter((c) => c.enabled);
 }
 
 /** Synthetic category used for one direct decision across all selected definitions. */

@@ -5,6 +5,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- With combined matching and two or more selected categories, a scan now asks Jev only the combined question
+  instead of that question plus one per selected category. Requests are about half the size with the default
+  three categories and about a third with nine, and accuracy on the labelled eval set is unchanged (148/151 and
+  126/126 at 75%). The badge no longer names the top matching categories until you choose **Why?**.
+
 ## [1.0.0] - 2026-09-29
 
 First release of this repository. It includes everything from the earlier development versions listed below.

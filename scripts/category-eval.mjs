@@ -3,7 +3,14 @@
 //   node scripts/category-eval.mjs --fetch      freeze YouTube metadata for cases that lack it (free)
 //   node scripts/category-eval.mjs --dry-run    build every request without calling Jev (free)
 //   node --env-file=.env scripts/category-eval.mjs [--threshold 0.75] [--model jev-1.13] [--only text]
-//        paid run; raw answers are saved to output/category-eval.json
+//        paid run; raw answers are saved to output/category-eval.json (or --out path)
+//   --no-details
+//        send only title, channel and duration, to measure what descriptions are worth
+//   --title output/category-eval-title.json
+//        with a full run: simulate asking with the title first and re-asking with details only when the
+//        title-only answer is within --title-band of the threshold; reports accuracy and input tokens
+//   --ask-each
+//        also ask each selected category next to the combined question (the extension before 1.1)
 //   node scripts/category-eval.mjs --from output/category-eval.json [--threshold 0.8]
 //        re-analyse saved answers without new requests
 //   --split dev|holdout
@@ -22,7 +29,10 @@ const flag = (name) => args.includes(`--${name}`);
 const option = (name, fallback) => (args.includes(`--${name}`) ? args[args.indexOf(`--${name}`) + 1] : fallback);
 
 const CASES_URL = new URL('./category-cases.json', import.meta.url);
-const OUT_URL = new URL('../output/category-eval.json', import.meta.url);
+const noDetails = flag('no-details');
+const OUT_URL = option('out')
+  ? pathToFileURL(option('out'))
+  : new URL(noDetails ? '../output/category-eval-title.json' : '../output/category-eval.json', import.meta.url);
 const threshold = Number(option('threshold', '0.75')); // DEFAULT_SETTINGS.threshold
 const margin = 0.2; // DEFAULT_SETTINGS.uncertainMargin
 const model = option('model', 'jev-1.13');
@@ -74,14 +84,18 @@ if (option('split')) cases = cases.filter((c) => (c.split ?? 'dev') === option('
 
 // One request per scenario, exactly as normal scanning sends it, plus one with every category (like Why?).
 function requestsFor(c) {
-  const video = { videoId: c.videoId, title: c.title, channel: c.channel, duration: c.duration, meta: '', isShort: c.isShort, details: c.details };
+  const video = { videoId: c.videoId, title: c.title, channel: c.channel, duration: c.duration, meta: '', isShort: c.isShort, details: noDetails ? undefined : c.details };
   const out = [];
   for (const s of SCENARIOS) {
     const categories = BUILTIN_CATEGORIES.map((b) => ({ ...b, enabled: s.selected.includes(b.id) }));
     const combined = combinedSelectionCategory?.({ categories, matchMethod: 'combined' });
-    out.push({ scope: s.name, ...buildJevRequest(video, [...categories.filter((b) => b.enabled), ...(combined ? [combined] : [])], model) });
+    // Mirrors categoriesToScore: the combined question alone when it applies, otherwise each selected category.
+    const selected = categories.filter((b) => b.enabled);
+    const cats = combined ? (flag('ask-each') ? [...selected, combined] : [combined]) : selected;
+    out.push({ scope: s.name, ...buildJevRequest(video, cats, model) });
   }
-  out.push({ scope: ALL, ...buildJevRequest(video, BUILTIN_CATEGORIES, model) });
+  // Why? always fetches details first, so a title-only run has no use for the full distribution.
+  if (!noDetails) out.push({ scope: ALL, ...buildJevRequest(video, BUILTIN_CATEGORIES, model) });
   return out;
 }
 
@@ -102,22 +116,42 @@ if (option('from')) {
   let cost = 0;
   let done = 0;
   const answers = {};
+  const tokens = {};
   await pool(jobs, 4, async ({ c, r }) => {
     const res = await ask(key, r.body);
     cost += res.usage?.cost ?? res.usage.input_tokens * 0.042e-6;
     const scores = Object.fromEntries([...r.names].map(([name, cat]) => [cat.id, res.answers?.[name]?.noul]));
     ((answers[c.videoId] ??= {})[r.scope] = scores);
+    ((tokens[c.videoId] ??= {})[r.scope] = res.usage?.input_tokens);
     if (++done % 20 === 0 || done === jobs.length) process.stderr.write(`\r${done}/${jobs.length} requests`);
   });
   process.stderr.write('\n');
-  saved = { model, at: new Date().toISOString(), defs: option('defs') ?? 'lib/categories.ts', costUsd: cost, answers };
+  saved = { model, at: new Date().toISOString(), defs: option('defs') ?? 'lib/categories.ts', details: !noDetails, costUsd: cost, answers, tokens };
   await mkdir(new URL('.', OUT_URL), { recursive: true });
   await writeFile(OUT_URL, JSON.stringify(saved, null, 2) + '\n');
 }
 
 report(saved);
+if (option('title')) titleFirst(saved, JSON.parse(await readFile(option('title'), 'utf8')));
 
 // ---------------------------------------------------------------------------------------------------------
+
+// Scores a scenario's saved answers the way the extension decides: the best of the combined and single scores.
+function decisionScore(s, ids) {
+  return Math.max(s.__selected_categories__ ?? 0, ...ids.map((id) => s[id] ?? 0));
+}
+
+/** Cases scored for a scenario, skipping ones whose only relevant label is a `maybe`. */
+function rowsFor(sc, scored, answers) {
+  const rows = [];
+  for (const c of scored) {
+    const definite = c.labels.some((id) => sc.ids.includes(id));
+    const possible = definite || (c.maybe ?? []).some((id) => sc.ids.includes(id));
+    if (!definite && possible) continue; // ambiguous for this selection
+    rows.push({ c, match: definite, s: answers[c.videoId][sc.name] ?? {} });
+  }
+  return rows;
+}
 
 function report({ answers, costUsd, model: m, defs }) {
   const scored = cases.filter((c) => answers[c.videoId]);
@@ -133,17 +167,14 @@ function report({ answers, costUsd, model: m, defs }) {
 
   const sweep = [];
   for (const sc of SCENARIOS) {
-    const rows = [];
-    for (const c of scored) {
-      const definite = c.labels.some((id) => sc.ids.includes(id));
-      const possible = definite || (c.maybe ?? []).some((id) => sc.ids.includes(id));
-      if (!definite && possible) continue; // ambiguous for this selection
-      rows.push({ c, match: definite, s: answers[c.videoId][sc.name] ?? {} });
-    }
+    const rows = rowsFor(sc, scored, answers);
     console.log(`\n## ${sc.name} (${sc.direction === 'block' ? 'block' : 'allow only'}: ${sc.ids.join(', ')}) · ${rows.length} scored`);
     const hasCombined = rows.some((r) => r.s.__selected_categories__ !== undefined);
+    const hasSingles = rows.some((r) => sc.selected.some((id) => r.s[id] !== undefined));
+    const available = { 'combined only': hasCombined, 'best single': hasSingles, 'max of both': hasCombined && hasSingles };
+    const finalMethod = available['max of both'] ? 'max of both' : hasCombined ? 'combined only' : 'best single';
     for (const [method, score] of Object.entries(METHODS)) {
-      if (!hasCombined && method !== 'best single') continue;
+      if (!available[method]) continue;
       const wrongHidden = [];
       const wrongShown = [];
       let borderline = 0;
@@ -158,16 +189,16 @@ function report({ answers, costUsd, model: m, defs }) {
       }
       const right = rows.length - wrongHidden.length - wrongShown.length;
       console.log(`  ${method.padEnd(14)} ${right}/${rows.length} right · ${wrongHidden.length} wanted videos hidden · ${wrongShown.length} unwanted shown · ${borderline} borderline`);
-      if (method === (hasCombined ? 'max of both' : 'best single') || flag('verbose')) {
+      if (method === finalMethod || flag('verbose')) {
         for (const line of wrongHidden) console.log(`      hid   ${line}`);
         for (const line of wrongShown) console.log(`      show  ${line}`);
       }
     }
-    const final = hasCombined ? METHODS['max of both'] : METHODS['best single'];
+    const final = METHODS[finalMethod];
     sweep.push([sc.name, [0.5, 0.6, 0.7, 0.75, 0.8, 0.9].map((t) => rows.filter(({ match, s }) => (final(s, sc.selected) >= t) === match).length / rows.length)]);
   }
 
-  console.log('\n## Threshold sweep: share of scored videos decided correctly (max of both, or best single without combined)');
+  console.log('\n## Threshold sweep: share of scored videos decided correctly (the method the extension uses)');
   console.log(`  ${''.padEnd(26)}${[50, 60, 70, 75, 80, 90].map((t) => `${t}%`.padStart(6)).join('')}`);
   for (const [name, accs] of sweep) console.log(`  ${name.padEnd(26)}${accs.map((a) => pct(a).padStart(6)).join('')}`);
 
@@ -193,6 +224,46 @@ function report({ answers, costUsd, model: m, defs }) {
     console.log(`  ${cat.label.padEnd(26)}${precision.padStart(10)}${recall.padStart(8)}   ${notes.slice(0, 4).join(' · ')}${notes.length > 4 ? ` · +${notes.length - 4} more` : ''}`);
   }
   console.log('\n  + scored as this category but not labelled; - labelled but scored below the threshold');
+}
+
+/**
+ * Simulates the extension's title-first flow from a full run and a --no-details run of the same cases: the
+ * title-only answer stands unless it is within `band` of the threshold, when the video is asked again with details.
+ */
+function titleFirst(full, title) {
+  const pct = (n) => `${Math.round(n * 100)}%`;
+  const scored = cases.filter((c) => full.answers[c.videoId] && title.answers[c.videoId]);
+  const bands = option('title-band') ? [Number(option('title-band'))] : [0, 0.1, 0.2, 0.3, 0.4, 0.5];
+  const tok = (run, c, scope) => run.tokens?.[c.videoId]?.[scope];
+  console.log(`\n## Title first at ${pct(threshold)}: title-only answer kept unless within the band of the threshold`);
+  console.log(`  ${'scenario'.padEnd(26)}${'band'.padStart(6)}${'right'.padStart(10)}${'hid'.padStart(6)}${'shown'.padStart(7)}${'re-asked'.padStart(10)}${'tokens'.padStart(9)}`);
+  for (const sc of SCENARIOS) {
+    const rows = rowsFor(sc, scored, full.answers);
+    const fullTokens = rows.reduce((n, { c }) => n + (tok(full, c, sc.name) ?? 0), 0);
+    const line = (label, band) => {
+      let right = 0;
+      let hid = 0;
+      let shown = 0;
+      let reasked = 0;
+      let tokens = 0;
+      for (const { c, match, s } of rows) {
+        const t = title.answers[c.videoId][sc.name] ?? {};
+        const pt = decisionScore(t, sc.selected);
+        const trusted = band !== undefined && Math.abs(pt - threshold) >= band;
+        tokens += band === undefined ? tok(full, c, sc.name) ?? 0 : (tok(title, c, sc.name) ?? 0) + (trusted ? 0 : tok(full, c, sc.name) ?? 0);
+        if (band !== undefined && !trusted) reasked++;
+        const predicted = (trusted ? pt : decisionScore(s, sc.selected)) >= threshold;
+        if (predicted === match) right++;
+        else if ((sc.direction === 'block') === predicted) hid++;
+        else shown++;
+      }
+      const saved = fullTokens ? ` ${tokens <= fullTokens ? '-' : '+'}${pct(Math.abs(1 - tokens / fullTokens))}` : '';
+      console.log(`  ${label.padEnd(26)}${(band === undefined ? 'full' : String(band)).padStart(6)}${`${right}/${rows.length}`.padStart(10)}${String(hid).padStart(6)}${String(shown).padStart(7)}${(band === undefined ? '—' : pct(reasked / rows.length)).padStart(10)}${String(tokens).padStart(9)}${saved}`);
+    };
+    line(sc.name, undefined);
+    for (const b of bands) line('', b);
+  }
+  console.log('  hid: wanted videos hidden · shown: unwanted videos shown · tokens: input tokens vs details on every request');
 }
 
 async function ask(key, body) {
