@@ -9,12 +9,15 @@
 //   --title output/category-eval-title.json
 //        with a full run: simulate asking with the title first and re-asking with details only when the
 //        title-only answer is within --title-band of the threshold; reports accuracy and input tokens
+//   --corrections feedkeeper-corrections.json [--dry-run]
+//        replay corrections exported from Settings: each video is asked with the filter it was judged under
+//        (built-in definitions from --defs, custom or edited ones as exported) and checked against your choice
 //   --ask-each
 //        also ask each selected category next to the combined question (the extension before 1.1)
 //   node scripts/category-eval.mjs --from output/category-eval.json [--threshold 0.8]
 //        re-analyse saved answers without new requests
-//   --split dev|holdout
-//        only the cases definitions were tuned on (dev), or the ones kept aside to check them (holdout)
+//   --split dev|holdout|holdout2|holdout3|holdout4 (comma-separated for several)
+//        only the cases definitions were tuned on (dev), or ones kept aside to check them (holdout*)
 //   --defs path/to/categories.ts --request path/to/request.ts
 //        score another version of the definitions or question wording (e.g. one exported from git)
 //
@@ -41,6 +44,7 @@ const { BUILTIN_CATEGORIES, combinedSelectionCategory } = await import(resolve(o
 const { buildJevRequest } = await import(resolve(option('request'), '../lib/request.ts'));
 
 const SCENARIOS = [
+  { name: 'Default selection', direction: 'block', ids: ['comedy', 'vlogs', 'challenges'] },
   { name: 'Block distractions', direction: 'block', ids: ['comedy', 'vlogs', 'challenges', 'reactions', 'drama', 'movies_tv', 'music', 'gaming', 'lifestyle'] },
   { name: 'Block politics, keep news', direction: 'block', ids: ['politics'] },
   { name: 'Only show learning', direction: 'allow', ids: ['education', 'tech'] },
@@ -58,6 +62,11 @@ for (const s of SCENARIOS) s.selected = [...new Set(s.ids.map(toDefs))];
 let cases = JSON.parse(await readFile(CASES_URL, 'utf8'));
 for (const c of cases) {
   for (const id of [...c.labels, ...(c.maybe ?? [])]) if (!toDefs(id)) throw new Error(`${c.videoId}: unknown category "${id}"`);
+}
+
+if (option('corrections')) {
+  await replayCorrections(JSON.parse(await readFile(option('corrections'), 'utf8')));
+  process.exit(0);
 }
 
 if (flag('fetch')) {
@@ -80,7 +89,7 @@ if (flag('fetch')) {
 const missing = cases.filter((c) => !c.details);
 if (missing.length) throw new Error(`${missing.length} cases lack details; run with --fetch first.`);
 if (option('only')) cases = cases.filter((c) => `${c.videoId} ${c.title}`.toLowerCase().includes(option('only').toLowerCase()));
-if (option('split')) cases = cases.filter((c) => (c.split ?? 'dev') === option('split'));
+if (option('split')) cases = cases.filter((c) => option('split').split(',').includes(c.split ?? 'dev'));
 
 // One request per scenario, exactly as normal scanning sends it, plus one with every category (like Why?).
 function requestsFor(c) {
@@ -119,7 +128,7 @@ if (option('from')) {
   const tokens = {};
   await pool(jobs, 4, async ({ c, r }) => {
     const res = await ask(key, r.body);
-    cost += res.usage?.cost ?? res.usage.input_tokens * 0.042e-6;
+    cost += res.usage?.cost || res.usage.input_tokens * 0.042e-6; // BYOK keys report 0
     const scores = Object.fromEntries([...r.names].map(([name, cat]) => [cat.id, res.answers?.[name]?.noul]));
     ((answers[c.videoId] ??= {})[r.scope] = scores);
     ((tokens[c.videoId] ??= {})[r.scope] = res.usage?.input_tokens);
@@ -153,7 +162,9 @@ function rowsFor(sc, scored, answers) {
   return rows;
 }
 
-function report({ answers, costUsd, model: m, defs }) {
+function report(saved) {
+  const { answers, costUsd, model: m, defs } = saved;
+  const summary = { right: 0, rows: 0, hid: 0, shown: 0 };
   const scored = cases.filter((c) => answers[c.videoId]);
   const pct = (n) => `${Math.round(n * 100)}%`;
   console.log(`model ${m} · definitions ${defs} · ${scored.length} videos${option('split') ? ` (${option('split')})` : ''} · threshold ${pct(threshold)}` +
@@ -188,6 +199,7 @@ function report({ answers, costUsd, model: m, defs }) {
         (hidden ? wrongHidden : wrongShown).push(`${pct(p).padStart(4)}  ${c.title.slice(0, 70)}  [${c.labels.join(', ')}]`);
       }
       const right = rows.length - wrongHidden.length - wrongShown.length;
+      if (method === finalMethod) Object.assign(summary, { right: summary.right + right, rows: summary.rows + rows.length, hid: summary.hid + wrongHidden.length, shown: summary.shown + wrongShown.length });
       console.log(`  ${method.padEnd(14)} ${right}/${rows.length} right · ${wrongHidden.length} wanted videos hidden · ${wrongShown.length} unwanted shown · ${borderline} borderline`);
       if (method === finalMethod || flag('verbose')) {
         for (const line of wrongHidden) console.log(`      hid   ${line}`);
@@ -224,6 +236,24 @@ function report({ answers, costUsd, model: m, defs }) {
     console.log(`  ${cat.label.padEnd(26)}${precision.padStart(10)}${recall.padStart(8)}   ${notes.slice(0, 4).join(' · ')}${notes.length > 4 ? ` · +${notes.length - 4} more` : ''}`);
   }
   console.log('\n  + scored as this category but not labelled; - labelled but scored below the threshold');
+  summary.categories = { tp: 0, fp: 0, fn: 0 };
+  for (const cat of BUILTIN_CATEGORIES) {
+    for (const c of scored) {
+      const p = answers[c.videoId][ALL]?.[cat.id];
+      if (p === undefined || maybeOf(c).includes(cat.id)) continue;
+      const label = labelsOf(c).includes(cat.id);
+      if (p >= threshold) summary.categories[label ? 'tp' : 'fp']++;
+      else if (label) summary.categories.fn++;
+    }
+  }
+  const avg = (scope) => {
+    const t = scored.map((c) => saved.tokens?.[c.videoId]?.[scope]).filter((x) => x !== undefined);
+    return t.length ? Math.round(t.reduce((a, b) => a + b, 0) / t.length) : '?';
+  };
+  const { tp, fp, fn } = summary.categories;
+  console.log(`\n## Summary: scans ${summary.right}/${summary.rows} right · ${summary.hid} wanted hidden · ${summary.shown} unwanted shown` +
+    ` · Why? precision ${tp + fp ? pct(tp / (tp + fp)) : '—'} recall ${tp + fn ? pct(tp / (tp + fn)) : '—'} (${fp} false, ${fn} missed)` +
+    ` · tokens per scan ${SCENARIOS.map((sc) => avg(sc.name)).join('/')} · per Why? ${avg(ALL)}`);
 }
 
 /**
@@ -264,6 +294,48 @@ function titleFirst(full, title) {
     for (const b of bands) line('', b);
   }
   console.log('  hid: wanted videos hidden · shown: unwanted videos shown · tokens: input tokens vs details on every request');
+}
+
+async function replayCorrections(file) {
+  if (file.format !== 'feedkeeper-corrections') throw new Error('Not a FeedKeeper corrections export');
+  const builtins = new Map(BUILTIN_CATEGORIES.map((b) => [b.id, b]));
+  const jobs = [];
+  for (const c of file.corrections) {
+    if (!c.details) c.details = await fetchVideo(c.videoId).then((v) => v.details, () => undefined);
+    // Built-ins the user didn't edit take the definitions under test; custom or edited ones keep their text.
+    const selected = c.categories.map((x) =>
+      x.builtin && !x.customized && builtins.has(x.id) ? { ...builtins.get(x.id), enabled: true } : { ...x, enabled: true, group: 'Custom' });
+    const combined = c.matchMethod === 'combined' ? combinedSelectionCategory({ categories: selected, matchMethod: 'combined' }) : undefined;
+    const video = { videoId: c.videoId, title: c.title, channel: c.channel, duration: c.duration, meta: '', isShort: false, details: c.details };
+    jobs.push({ c, ids: selected.map((x) => x.id), ...buildJevRequest(video, combined ? [combined] : selected, model) });
+  }
+  if (flag('dry-run')) {
+    const chars = jobs.reduce((n, j) => n + JSON.stringify(j.body).length, 0);
+    console.log(`${jobs.length} corrections → ~${Math.round(chars / 4 / 1000)}k input tokens. Nothing sent.`);
+    return;
+  }
+  const key = process.env.OPENROUTER_API_KEY;
+  if (!key) throw new Error('Set OPENROUTER_API_KEY (e.g. node --env-file=.env …), or use --dry-run.');
+  let cost = 0;
+  const rows = [];
+  await pool(jobs, 4, async (j) => {
+    const res = await ask(key, j.body);
+    cost += res.usage?.cost || res.usage.input_tokens * 0.042e-6; // BYOK keys report 0
+    const s = Object.fromEntries([...j.names].map(([name, cat]) => [cat.id, res.answers?.[name]?.noul]));
+    const p = decisionScore(s, j.ids);
+    const matched = p >= j.c.threshold;
+    rows.push({ c: j.c, p, filtered: j.c.filterDirection === 'block' ? matched : !matched });
+  });
+  const pct = (n) => `${Math.round(n * 100)}%`;
+  const ok = (filtered, c) => filtered === (c.want === 'hide');
+  const before = rows.filter((r) => ok(r.c.wasFiltered, r.c)).length;
+  const now = rows.filter((r) => ok(r.filtered, r.c)).length;
+  console.log(`definitions ${option('defs') ?? 'lib/categories.ts'} · ${rows.length} corrections · cost $${cost.toFixed(4)}`);
+  console.log(`  decided your way: ${now}/${rows.length} now, ${before}/${rows.length} when you corrected them`);
+  for (const { c, p, filtered } of rows.sort((a, b) => Number(ok(a.filtered, a.c)) - Number(ok(b.filtered, b.c)))) {
+    const mark = ok(filtered, c) ? (ok(c.wasFiltered, c) ? '  ok   ' : '  fixed') : '  wrong';
+    console.log(`${mark}  want ${c.want.padEnd(4)} ${pct(p).padStart(4)}  ${c.title.slice(0, 70)}  [${c.categories.map((x) => x.id).join(', ')}]`);
+  }
 }
 
 async function ask(key, body) {

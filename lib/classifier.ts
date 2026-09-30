@@ -94,6 +94,13 @@ async function limit<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+/** The YouTube details cached with a video's scores, if any; used to export corrections without refetching. */
+export async function cachedDetails(videoId: string): Promise<VideoDetails | undefined> {
+  const key = CACHE_PREFIX + videoId;
+  const { [key]: raw } = await browser.storage.local.get(key);
+  return (raw as CacheEntry | undefined)?.details;
+}
+
 export async function clearCache(): Promise<number> {
   const all = await browser.storage.local.get(null);
   const keys = Object.keys(all).filter((k) => k.startsWith(CACHE_PREFIX));

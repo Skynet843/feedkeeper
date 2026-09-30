@@ -76,7 +76,7 @@ for (const v of SAMPLES) {
     console.log('First response (truncated):', text.slice(0, 400), '\n');
     first = false;
   }
-  cost += json.usage?.cost ?? json.usage.input_tokens * 0.042e-6;
+  cost += json.usage?.cost || json.usage.input_tokens * 0.042e-6; // BYOK keys report 0
   const scores = [...names]
     .map(([name, c]) => [c.label, json.answers?.[name]?.noul])
     .filter(([, p]) => typeof p === 'number')

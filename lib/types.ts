@@ -69,7 +69,7 @@ export interface Settings {
   alwaysShowVideos: string[];
   alwaysHideVideos: string[];
   surfaces: { home: boolean; watch: boolean };
-  /** Hide every Short on YouTube (shelves, tiles, search and the Shorts nav entry); hidden Shorts are never classified. */
+  /** Hide every Short on YouTube (shelves, tiles, search and the Shorts nav entry). Shorts are never classified. */
   blockShorts: boolean;
   uncertainBehavior: UncertainBehavior;
   uncertainMargin: number;
@@ -126,6 +126,28 @@ export interface DecisionHistoryEntry {
   action: 'would-filter' | 'hidden' | 'removed';
   reason: string;
   score?: number;
+}
+
+/**
+ * A video the user corrected with Always show or Always hide, with the filter it was judged under, so real
+ * mistakes can be exported and replayed by the eval script.
+ */
+export interface CorrectionEntry {
+  videoId: string;
+  title: string;
+  channel: string;
+  duration: string;
+  at: number;
+  want: 'show' | 'hide';
+  /** FeedKeeper's decision when the user clicked; it was a mistake when this differs from `want`. */
+  wasFiltered: boolean;
+  reason: string;
+  score?: number;
+  filterDirection: FilterDirection;
+  matchMethod: MatchMethod;
+  threshold: number;
+  /** The selected categories as they were defined then, so the eval can ask the same questions. */
+  categories: Pick<Category, 'id' | 'label' | 'description' | 'builtin' | 'customized'>[];
 }
 
 export type Message =

@@ -31,7 +31,7 @@ sequenceDiagram
 The content script scans only the YouTube home feed and the watch-page recommendation sidebar. It reacts to
 YouTube's client-side navigation and re-rendering, then decorates matching tiles without replacing YouTube's
 own UI. The one exception is **Block Shorts**: it injects a stylesheet built from the Shorts selectors that hides
-Shorts on every YouTube page, and Shorts it hides are skipped rather than classified.
+Shorts on every YouTube page. Shorts are never classified, whether or not they are blocked.
 
 ## Main components
 
@@ -50,7 +50,8 @@ Shorts on every YouTube page, and Shorts it hides are skipped rather than classi
 
 ### Stored locally
 
-- the OpenRouter API key, user settings, profiles, local rules, and optional latest-200 decision history
+- the OpenRouter API key, user settings, profiles, local rules, optional latest-200 decision history, and up to
+  500 corrections (Always show/hide choices with the filter they were judged under) for exporting as eval cases
 - category scores and cleaned video details, expiring after 14 days
 - daily counters for scanned, matched, actioned, requests, tokens, and estimated cost
 
@@ -60,7 +61,7 @@ uninstalling the extension removes the extension's local storage.
 ### Sent to OpenRouter
 
 The background worker sends the fields listed in [the privacy policy](../PRIVACY.md): title, channel, duration,
-format, and—when enabled—cleaned description, chapters, tags, and YouTube category. Questions are generated from
+and—when enabled—cleaned description, chapters, tags, and YouTube category. Questions are generated from
 the enabled category definitions. The user's OpenRouter key authorizes this request.
 
 ### Sent to YouTube

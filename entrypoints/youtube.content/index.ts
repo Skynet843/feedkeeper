@@ -6,7 +6,7 @@ import { fetchDetails } from '@/lib/details';
 import { extractVideo } from '@/lib/extract';
 import { PacedQueue } from '@/lib/queue';
 import { SEL } from '@/lib/selectors';
-import { getSettings, onSettingsChanged, recordDecision, saveSettings } from '@/lib/storage';
+import { getSettings, onSettingsChanged, recordCorrection, recordDecision, saveSettings } from '@/lib/storage';
 import type { ClassifyResponse, Message, Scores, Settings, VideoMeta } from '@/lib/types';
 import './style.css';
 
@@ -91,7 +91,8 @@ export default defineContentScript({
       for (const tile of pageTiles(page)) {
         const video = extractVideo(tile);
         if (!video) continue;
-        if (video.isShort && shortsBlocked()) continue; // hidden anyway; don't pay to classify it
+        // Shorts are never classified: Block Shorts hides them all for free, otherwise they're left as they are.
+        if (video.isShort) continue;
 
         let state = tiles.get(tile);
         // YouTube recycles tile elements for different videos; start over when that happens.
@@ -309,14 +310,37 @@ export default defineContentScript({
       }
       const actions = document.createElement('div');
       actions.className = 'ytf-inspector-actions';
+      // Remembered with the filter they were judged under, so they can be exported as test cases (Settings).
+      const correct = (want: 'show' | 'hide') => {
+        if (!settings.historyEnabled || state.localDecision) return;
+        void recordCorrection({
+          videoId: state.video.videoId,
+          title: state.video.title,
+          channel: state.video.channel,
+          duration: state.video.duration,
+          at: Date.now(),
+          want,
+          wasFiltered: decision.filter,
+          reason: decision.reason,
+          score: decision.score,
+          filterDirection: settings.filterDirection,
+          matchMethod: settings.matchMethod,
+          threshold: settings.threshold,
+          categories: settings.categories
+            .filter((c) => c.enabled)
+            .map(({ id, label, description, builtin, customized }) => ({ id, label, description, builtin, customized })),
+        });
+      };
       actions.append(
         feedbackButton('Always show video', async () => {
+          correct('show');
           await saveSettings({
             alwaysShowVideos: unique([...settings.alwaysShowVideos, state.video.videoId]),
             alwaysHideVideos: settings.alwaysHideVideos.filter((id) => id !== state.video.videoId),
           });
         }),
         feedbackButton('Always hide video', async () => {
+          correct('hide');
           await saveSettings({
             alwaysHideVideos: unique([...settings.alwaysHideVideos, state.video.videoId]),
             alwaysShowVideos: settings.alwaysShowVideos.filter((id) => id !== state.video.videoId),
@@ -345,8 +369,6 @@ export default defineContentScript({
       state.decorated = false;
       const page = currentPage();
       if (!settings.enabled || !page || !settings.surfaces[page]) return;
-      // A Short scored before Block Shorts was turned on is hidden; never count, record or queue it.
-      if (state.video.isShort && shortsBlocked()) return;
 
       const matches = matchesOf(state);
       const decision = decisionOf(state);
@@ -468,7 +490,7 @@ export default defineContentScript({
         let lastError = '';
         for (const tile of pageTiles(page)) {
           const st = tiles.get(tile);
-          if (!st || (st.video.isShort && shortsBlocked())) continue;
+          if (!st) continue;
           if (st.status === 'pending') pending++;
           else if (st.status === 'error') {
             failed++;
@@ -545,8 +567,6 @@ export default defineContentScript({
       } else if (!rescoreTimer) {
         rerenderAll();
       }
-      // Shorts skipped while blocked have no scores yet.
-      if (prev.blockShorts && !next.blockShorts) scan();
       updatePill();
     });
 

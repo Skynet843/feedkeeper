@@ -49,7 +49,8 @@ those clicks and stops recommending them.
 
 ## Features
 
-- **Works where you get pulled in:** the home feed and the recommendations next to a video, including Shorts.
+- **Works where you get pulled in:** the home feed and the recommendations next to a video. Shorts are never
+  sent to the AI; hide them all with **Block Shorts**.
 - **Block Shorts:** one switch hides every Short on YouTube (shelves, feeds, search and the Shorts menu entry),
   with no AI calls and no cost.
 - **Two filter directions:** block selected categories, or use **Only show selected** for a focused feed.

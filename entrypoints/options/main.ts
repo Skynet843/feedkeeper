@@ -1,7 +1,8 @@
 import { browser } from 'wxt/browser';
 import '@/lib/ui.css';
 import { groupCategories, newCustomCategory } from '@/lib/categories';
-import { applyProfile, clearDecisionHistory, getDecisionHistory, getSettings, saveSettings } from '@/lib/storage';
+import { cachedDetails } from '@/lib/classifier';
+import { applyProfile, clearCorrections, clearDecisionHistory, getCorrections, getDecisionHistory, getSettings, saveSettings } from '@/lib/storage';
 import type { Category, FilterProfile, Message, Settings, TestKeyResponse } from '@/lib/types';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -143,6 +144,26 @@ async function renderHistory(): Promise<void> {
   if (!history.length) $('history').textContent = 'No filtered videos recorded yet.';
 }
 
+async function renderCorrections(): Promise<void> {
+  const list = await getCorrections();
+  const wrong = list.filter((c) => c.wasFiltered !== (c.want === 'hide')).length;
+  $('corrections-count').textContent = `${list.length} saved, ${wrong} where FeedKeeper got it wrong`;
+  $<HTMLButtonElement>('exportCorrections').disabled = list.length === 0;
+}
+
+async function exportCorrections(): Promise<void> {
+  const list = await getCorrections();
+  // Cached details let the eval replay the exact request without fetching YouTube again.
+  const corrections = await Promise.all(list.map(async (c) => ({ ...c, details: await cachedDetails(c.videoId) })));
+  const file = { format: 'feedkeeper-corrections', version: 1, exportedAt: new Date().toISOString(), corrections };
+  const url = URL.createObjectURL(new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `feedkeeper-corrections-${file.exportedAt.slice(0, 10)}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 async function init(): Promise<void> {
   const s = await getSettings();
 
@@ -168,6 +189,7 @@ async function init(): Promise<void> {
   renderCategories(s.categories);
   renderProfiles(s.profiles);
   void renderHistory();
+  void renderCorrections();
 
   input('apiKey').addEventListener('change', () => save({ apiKey: input('apiKey').value.trim() }));
   input('model').addEventListener('change', () => save({ model: input('model').value.trim() || 'jev-1.13' }));
@@ -268,7 +290,15 @@ async function init(): Promise<void> {
     input('profileName').value = '';
   });
 
-  $('refreshHistory').addEventListener('click', () => void renderHistory());
+  $('refreshHistory').addEventListener('click', () => {
+    void renderHistory();
+    void renderCorrections();
+  });
+  $('exportCorrections').addEventListener('click', () => void exportCorrections());
+  $('clearCorrections').addEventListener('click', async () => {
+    await clearCorrections();
+    await renderCorrections();
+  });
   $('clearHistory').addEventListener('click', async () => {
     await clearDecisionHistory();
     await renderHistory();

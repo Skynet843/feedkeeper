@@ -3,7 +3,10 @@
 // browser-like runtimes unless `dangerouslyAllowBrowser` is set, and we only need one call.
 
 export const JEV_ENDPOINT = 'https://openrouter.ai/api/v1/systemone';
-/** Used for the stats estimate when the response doesn't report a cost. */
+/**
+ * Used for the stats estimate when the response reports no cost, or $0 for a request that used tokens: with a
+ * TypeSafe key attached to OpenRouter (BYOK), TypeSafe bills the request and OpenRouter reports 0.
+ */
 const USD_PER_INPUT_TOKEN = 0.042 / 1_000_000;
 
 type Entry = string | Record<string, unknown> | unknown[] | null;
@@ -76,7 +79,7 @@ async function attemptOnce(apiKey: string, body: unknown, timeoutMs: number): Pr
 }
 
 export function estimateCost(r: SystemOneResult): number {
-  return r.usage.cost ?? r.usage.input_tokens * USD_PER_INPUT_TOKEN;
+  return r.usage.cost || r.usage.input_tokens * USD_PER_INPUT_TOKEN;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

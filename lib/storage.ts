@@ -1,6 +1,6 @@
 import { browser } from 'wxt/browser';
 import { BUILTIN_CATEGORIES, CUSTOM_GROUP, migrateCategoryIds, REPLACED_BY, SPLIT_FROM } from './categories';
-import type { DayStats, DecisionHistoryEntry, FilterProfile, FilterSnapshot, Settings } from './types';
+import type { CorrectionEntry, DayStats, DecisionHistoryEntry, FilterProfile, FilterSnapshot, Settings } from './types';
 
 export const DEFAULT_SETTINGS: Settings = {
   enabled: true,
@@ -136,6 +136,8 @@ const statsKey = () => `stats:${today()}`;
 const EMPTY_STATS: DayStats = { scanned: 0, matched: 0, actioned: 0, requests: 0, inputTokens: 0, costUsd: 0 };
 const HISTORY_KEY = 'decisionHistory';
 const HISTORY_LIMIT = 200;
+const CORRECTIONS_KEY = 'corrections';
+const CORRECTIONS_LIMIT = 500;
 
 export async function getTodayStats(): Promise<DayStats> {
   const key = statsKey();
@@ -173,4 +175,23 @@ export async function getDecisionHistory(): Promise<DecisionHistoryEntry[]> {
 
 export async function clearDecisionHistory(): Promise<void> {
   await browser.storage.local.remove(HISTORY_KEY);
+}
+
+let correctionsChain: Promise<unknown> = Promise.resolve();
+export function recordCorrection(entry: CorrectionEntry): Promise<void> {
+  const run = correctionsChain.then(async () => {
+    const list = await getCorrections();
+    await browser.storage.local.set({ [CORRECTIONS_KEY]: [entry, ...list.filter((x) => x.videoId !== entry.videoId)].slice(0, CORRECTIONS_LIMIT) });
+  });
+  correctionsChain = run.catch(() => {});
+  return run;
+}
+
+export async function getCorrections(): Promise<CorrectionEntry[]> {
+  const { [CORRECTIONS_KEY]: raw } = await browser.storage.local.get(CORRECTIONS_KEY);
+  return (raw as CorrectionEntry[] | undefined) ?? [];
+}
+
+export async function clearCorrections(): Promise<void> {
+  await browser.storage.local.remove(CORRECTIONS_KEY);
 }

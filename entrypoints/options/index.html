@@ -200,10 +200,10 @@
 
       <section>
         <h2>Where FeedKeeper runs</h2>
-        <label class="row" style="margin-bottom: 8px"><input type="checkbox" id="surfaceHome" /> YouTube home feed, including Shorts shelves</label>
+        <label class="row" style="margin-bottom: 8px"><input type="checkbox" id="surfaceHome" /> YouTube home feed</label>
         <label class="row"><input type="checkbox" id="surfaceWatch" /> Recommendations beside a playing video</label>
         <label class="row" style="margin-top: 14px"><input type="checkbox" id="blockShorts" /> Block Shorts everywhere on YouTube</label>
-        <p class="muted">Hides Shorts shelves, single Shorts in feeds and search, and the Shorts menu entry. Hidden Shorts are never scored, so this costs nothing.</p>
+        <p class="muted">Hides Shorts shelves, single Shorts in feeds and search, and the Shorts menu entry. Shorts are never scored, so this costs nothing; with it off, Shorts are shown unfiltered.</p>
       </section>
 
       <section>
@@ -224,6 +224,17 @@
           <button id="clearHistory">Clear history</button>
         </div>
         <div id="history"></div>
+        <h3 style="font-size: 14px; margin: 18px 0 8px">Corrections</h3>
+        <p class="muted">
+          Choosing <strong>Always show video</strong> or <strong>Always hide video</strong> under <strong>Why?</strong> also saves
+          the video and the filter it was judged under, while history is on. Export them to test category definitions against
+          your own corrections (<code>pnpm eval --corrections file.json</code>). They never leave this browser unless you export them.
+        </p>
+        <div class="row" style="margin-top: 10px">
+          <span id="corrections-count" class="muted"></span>
+          <button id="exportCorrections">Export for testing</button>
+          <button id="clearCorrections">Clear corrections</button>
+        </div>
       </section>
 
       <section>

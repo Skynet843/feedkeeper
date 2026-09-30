@@ -5,7 +5,30 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Corrections:** with history on, choosing **Always show video** or **Always hide video** under **Why?** saves the
+  video with the filter it was judged under. Settings can export them, and `pnpm eval --corrections <file>` replays
+  them to check definition changes against your own corrections.
+- 128 more labelled eval videos (`holdout4`, `holdout5`): Hindi and Hinglish titles, overlap-heavy cases and the
+  thinner categories, plus a scenario for the default Comedy, Vlogs and Challenges selection.
+
+### Fixed
+
+- The daily cost counter showed $0 when a TypeSafe key is attached to OpenRouter (BYOK), because OpenRouter reports
+  those requests as free. A reported $0 for a request that used tokens now falls back to the token estimate.
+
 ### Changed
+
+- Shorts are never classified. **Block Shorts** hides them for free; with it off they are shown unfiltered.
+- Shorter question wording without the separate yes/no criteria, and no format field. Scans cost 2–12% fewer
+  tokens and **Why?** 27% fewer. Cached scores are asked again once, because the question version changed.
+- Tighter definitions: Challenges covers creator-versus-creator contests, timed survival stays and philanthropy
+  stunts; Vlogs covers ASMR, roleplay and what-I-eat-in-a-day videos; Drama covers celebrity controversy roundups;
+  Music covers music production. Lifestyle, Health, Podcasts and News exclude eating challenges, routine vlogs, TV
+  debates and campaign speeches. On 293 labelled videos, scans decide 1046/1059 correctly instead of 1033, with
+  8 unwanted videos shown instead of 23 and 5 wanted videos hidden instead of 3 (all borderline, 57–74%), and
+  **Why?** makes no false matches instead of 11.
 
 - With combined matching and two or more selected categories, a scan now asks Jev only the combined question
   instead of that question plus one per selected category. Requests are about half the size with the default

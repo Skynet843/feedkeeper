@@ -17,5 +17,8 @@ Stored locally in `chrome.storage.local`:
 - per-video scores and descriptions, deleted after 14 days (**Clear cached scores** in Settings deletes them now)
 - daily counters (scanned, matched, removed, cost)
 - if enabled, the latest 200 filter decisions (video ID, title, channel, reason and time); clear them in Settings
+- with history enabled, up to 500 corrections you made with **Always show video** or **Always hide video** (video
+  ID, title, channel, duration, the decision and your selected categories); they leave the browser only if you choose
+  **Export for testing**, and **Clear corrections** deletes them
 
 Uninstalling the extension deletes all of it.
